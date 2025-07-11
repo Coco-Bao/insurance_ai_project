@@ -80,10 +80,11 @@ This project includes `.env` in `.gitignore` to ensure your sensitive keys are n
 
 If you accidentally committed `.env`, remove it with:
 
+```env
 git rm --cached .env
 git commit -m "Remove .env file from repository"
 git push
-
+```
 
 ---
 
@@ -99,8 +100,9 @@ docker run --env-file .env -p 5000:5000 insurance_ai_project
 
 ### Alternative: Passing environment variables directly
 
+```env
 docker run -e OPENAI_API_KEY=your_google_api_key_here -e OPENAI_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai -p 5000:5000 insurance_ai_project
-
+```
 
 ---
 
@@ -120,8 +122,10 @@ docker exec -it <container_id_or_name> /bin/bash
 
 3. Check environment variables:
 
+```env
 echo $OPENAI_API_KEY
 echo $OPENAI_API_BASE
+```
 
 ---
 
