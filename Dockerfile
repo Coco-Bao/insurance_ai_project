@@ -1,5 +1,5 @@
 # 選擇基礎映像，使用官方 Python 3.9 slim 版本，體積較小且兼容性好
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 # 設定環境變數，確保 Python 輸出不緩衝，方便日誌即時查看
 ENV PYTHONUNBUFFERED=1
