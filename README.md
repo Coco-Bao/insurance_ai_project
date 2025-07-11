@@ -70,7 +70,7 @@ In the root directory of the project, create a file named `.env` with the follow
 ```env
 OPENAI_API_KEY=your_google_api_key_here
 OPENAI_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai
-
+```
 
 > **Important:** Replace `your_google_api_key_here` with your own Google API key.
 
