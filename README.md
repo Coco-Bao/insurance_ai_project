@@ -56,7 +56,6 @@ Using `.env` file to pass environment variables (recommended):
 
 docker run --env-file .env -p 5000:5000 insurance_ai_project
 
-text
 
 ---
 
@@ -68,10 +67,10 @@ This project requires sensitive API keys to run, such as your Google API key. To
 
 In the root directory of the project, create a file named `.env` with the following content:
 
+```env
 OPENAI_API_KEY=your_google_api_key_here
 OPENAI_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai
 
-text
 
 > **Important:** Replace `your_google_api_key_here` with your own Google API key.
 
@@ -85,7 +84,6 @@ git rm --cached .env
 git commit -m "Remove .env file from repository"
 git push
 
-text
 
 ---
 
@@ -95,7 +93,6 @@ text
 
 docker run --env-file .env -p 5000:5000 insurance_ai_project
 
-text
 
 - Loads environment variables from `.env` into the container.  
 - Maps container port 5000 to local port 5000.
@@ -104,7 +101,6 @@ text
 
 docker run -e OPENAI_API_KEY=your_google_api_key_here -e OPENAI_API_BASE=https://generativelanguage.googleapis.com/v1beta/openai -p 5000:5000 insurance_ai_project
 
-text
 
 ---
 
@@ -116,20 +112,16 @@ To verify that environment variables are correctly set inside the running contai
 
 docker ps
 
-text
 
 2. Access the container shell:
 
 docker exec -it <container_id_or_name> /bin/bash
 
-text
 
 3. Check environment variables:
 
 echo $OPENAI_API_KEY
 echo $OPENAI_API_BASE
-
-text
 
 ---
 
@@ -144,7 +136,8 @@ text
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+
 
 ---
 
