@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<title>保險 AI Workflow</title>
+<style>
+  body { font-family: Arial; margin: 20px; }
+  input[type="file"] { margin-top: 10px; }
+  button { margin-top: 10px; padding: 8px 16px; cursor: pointer; }
+  #result { margin-top: 20px; white-space: pre-wrap; background: #f0f0f0; padding: 10px; border-radius: 4px; }
+  #loading { display: none; margin-top: 10px; color: blue; }
+</style>
+</head>
+<body>
+<h1>Insurance AI Workflow</h1>
+
+<h2>1. 上傳新產品 PDF（結構化存入資料庫）</h2>
+<input type="file" id="productPdf" accept="application/pdf" />
+<button onclick="uploadProductPdf()">上傳並解析</button>
+<p><em>提示：首次運行或新增產品時，請先上傳產品PDF。</em></p>
+
+<h2>2. 上傳客戶資料 PDF（獲取產品推薦）</h2>
+<input type="file" id="customerPdf" accept="application/pdf" />
+<button onclick="uploadCustomerPdfAndRecommend()">上傳客戶資料並獲取推薦</button>
+
+<div id="loading">處理中，請稍候...</div>
+
+<div id="result"></div>
+
+<script>
+const API_BASE = 'http://127.0.0.1:5000';
+const loadingElement = document.getElementById('loading');
+const resultElement = document.getElementById('result');
+
+async function uploadProductPdf() {
+  const fileInput = document.getElementById('productPdf');
+  if (!fileInput.files.length) {
+    alert('請選擇產品PDF文件');
+    return;
+  }
+  loadingElement.style.display = 'block';
+  resultElement.textContent = '';
+  try {
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    const res = await fetch(`${API_BASE}/upload_product_pdf`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    alert(data.message || data.error);
+    resultElement.textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    alert('上傳產品PDF失敗，請檢查後端服務是否啟動');
+    console.error(err);
+  } finally {
+    loadingElement.style.display = 'none';
+  }
+}
+
+async function uploadCustomerPdfAndRecommend() {
+  const fileInput = document.getElementById('customerPdf');
+  if (!fileInput.files.length) {
+    alert('請選擇客戶資料PDF文件');
+    return;
+  }
+  loadingElement.style.display = 'block';
+  resultElement.textContent = '';
+  try {
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    const res = await fetch(`${API_BASE}/upload_customer_pdf_and_recommend`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if(data.error) {
+      resultElement.textContent = '錯誤：' + data.error;
+      return;
+    }
+    let output = '推薦結果：\n' + data.recommendation + '\n\n支持依據：\n';
+    if (data.supported_by && data.supported_by.length > 0) {
+      data.supported_by.forEach(s => {
+        output += `文件：${s.source_file || 'N/A'}，段落：${s.chunk_index || 'N/A'}\n產品結構化數據預覽：${s.structured_data_preview || 'N/A'}\n\n`;
+      });
+    } else {
+        output += '無明確支持依據。';
+    }
+    resultElement.textContent = output;
+  } catch (err) {
+    alert('上傳客戶資料並獲取推薦失敗，請檢查後端服務是否啟動');
+    console.error(err);
+  } finally {
+    loadingElement.style.display = 'none';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import os
+import uuid
+from langchain_service import ProductDatabaseBuilder, InsuranceAIAgent
+from pillow_heif import register_heif_opener
+
+register_heif_opener()
+
+app = Flask(__name__)
+CORS(app)
+
+UPLOAD_FOLDER = 'backend/uploaded_files'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+db_builder = ProductDatabaseBuilder()
+ai_agent = InsuranceAIAgent()
+
+
+@app.route('/upload_product_pdf', methods=['POST'])
+def upload_product_pdf():
+    if 'file' not in request.files:
+        return jsonify({"error": "請上傳產品PDF檔案"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "檔案名稱不可為空"}), 400
+
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    if ext != 'pdf':
+        return jsonify({"error": "只支援PDF格式"}), 400
+
+    unique_filename = f"product_{uuid.uuid4()}.pdf"
+    file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+    file.save(file_path)
+
+    try:
+        db_builder.build_product_database(file_path)
+        global ai_agent
+        ai_agent = InsuranceAIAgent()  # 重新載入資料庫，確保推薦使用最新資料
+        return jsonify({"message": "產品資料庫更新成功"})
+    except Exception as e:
+        print(f"產品PDF處理失敗: {e}")
+        return jsonify({"error": f"產品PDF處理失敗: {str(e)}"}), 500
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+@app.route('/upload_customer_pdf_and_recommend', methods=['POST'])
+def upload_customer_pdf_and_recommend():
+    if 'file' not in request.files:
+        return jsonify({"error": "請上傳客戶資料PDF檔案"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "檔案名稱不可為空"}), 400
+
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    if ext != 'pdf':
+        return jsonify({"error": "只支援PDF格式"}), 400
+
+    unique_filename = f"customer_{uuid.uuid4()}.pdf"
+    file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+    file.save(file_path)
+
+    try:
+        customer_profile = ai_agent.extract_customer_profile(file_path)
+        result = ai_agent.recommend_products(customer_profile)
+        return jsonify(result)
+    except Exception as e:
+        print(f"客戶PDF處理失敗: {e}")
+        return jsonify({"error": f"客戶PDF處理失敗: {str(e)}"}), 500
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+if __name__ == '__main__':
+    print("後端服務準備就緒。")
+    app.run(debug=True, port=5000)
