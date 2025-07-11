@@ -35,8 +35,10 @@ This project provides an AI insurance agent that leverages Google’s generative
 
 1. **Clone the repository**
 
+```env
 git clone https://github.com/your-username/your-repo.git
 cd your-repo
+```
 
 text
 
@@ -46,16 +48,18 @@ See the next section for details on how to create and configure `.env`.
 
 3. **Build the Docker image**
 
+```env
 docker build -t insurance_ai_project .
+```
 
-text
 
 4. **Run the Docker container**
 
 Using `.env` file to pass environment variables (recommended):
 
+```env
 docker run --env-file .env -p 5000:5000 insurance_ai_project
-
+```
 
 ---
 
