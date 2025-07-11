@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # libheif-dev：pillow_heif 編譯依賴
 
 # 設定工作目錄
-WORKDIR /app
+WORKDIR /app/backend
 
 # 先複製 requirements.txt，利用 Docker 快取機制加速構建
 COPY requirements.txt /app/
