@@ -16,10 +16,6 @@ import numpy as np
 
 CHROMA_DB_PATH = "data/chroma_db"
 
-# 設置 Gemini API Key 和 Base URL
-os.environ["OPENAI_API_KEY"] = "AIzaSyCpoWTEbR9ggzR_74bkUUdjir_2Kw8ALm0"
-os.environ["OPENAI_API_BASE"] = "https://generativelanguage.googleapis.com/v1beta/openai"
-
 # 初始化 EasyOCR，支持繁体中文和英文
 easyocr_reader = easyocr.Reader(['ch_tra', 'en'], gpu=False)  # gpu=True 如果你有GPU支持
 
