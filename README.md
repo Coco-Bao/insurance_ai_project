@@ -40,7 +40,6 @@ git clone https://github.com/your-username/your-repo.git
 cd your-repo
 ```
 
-text
 
 2. **Create a `.env` file**
 
@@ -121,8 +120,9 @@ docker ps
 
 2. Access the container shell:
 
+```env
 docker exec -it <container_id_or_name> /bin/bash
-
+```
 
 3. Check environment variables:
 
