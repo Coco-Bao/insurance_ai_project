@@ -115,8 +115,9 @@ To verify that environment variables are correctly set inside the running contai
 
 1. Find the container ID or name:
 
+```env
 docker ps
-
+```
 
 2. Access the container shell:
 
