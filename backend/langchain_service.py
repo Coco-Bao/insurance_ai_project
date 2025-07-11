@@ -9,57 +9,65 @@ from langchain.schema import Document
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
-import easyocr
+from paddleocr import PaddleOCR
 from pdf2image import convert_from_path
 import cv2
 import numpy as np
 
 CHROMA_DB_PATH = "data/chroma_db"
 
-# 設置 Gemini API Key 和 Base URL
-os.environ["OPENAI_API_KEY"] = "AIzaSyCpoWTEbR9ggzR_74bkUUdjir_2Kw8ALm0"
-os.environ["OPENAI_API_BASE"] = "https://generativelanguage.googleapis.com/v1beta/openai"
+# 初始化 PaddleOCR，支援繁體中文和英文，GPU設為False（如有GPU可設True）
+paddle_ocr = PaddleOCR(lang='ch', use_angle_cls=True, use_gpu=False)
 
-# 初始化 EasyOCR，支持繁体中文和英文
-easyocr_reader = easyocr.Reader(['ch_tra', 'en'], gpu=False)  # gpu=True 如果你有GPU支持
-
-class EasyOCRPDFLoader:
+class PaddleOCRPDFLoader:
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
+        self.ocr = paddle_ocr
 
     def load(self) -> List[Document]:
+        # 將PDF每頁轉換為圖片
         pages = convert_from_path(self.pdf_path)
         documents = []
         for i, page in enumerate(pages):
+            # 將PIL圖片轉成OpenCV格式（BGR）
             img = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
-            result = easyocr_reader.readtext(img, detail=0)  # detail=0 只返回文本
-            page_text = "\n".join(result)
+            # 使用PaddleOCR進行文字辨識，cls=True啟用方向分類
+            result = self.ocr.ocr(img, cls=True)
+            # 將辨識結果中每行文字取出並合併成一整頁文字
+            page_text = "\n".join([line[1][0] for line in result[0]])
+            # 封裝成Document物件，並加入頁碼metadata
             documents.append(Document(page_content=page_text, metadata={"page": i + 1}))
-        print(f"EasyOCR共识别 {len(documents)} 页")
+        print(f"PaddleOCR共識別 {len(documents)} 頁")
         return documents
 
 
 class ProductDatabaseBuilder:
     def __init__(self):
+        # 初始化OpenAI嵌入模型
         self.embeddings = OpenAIEmbeddings()
+        # 初始化ChatOpenAI模型，使用Gemini 2.0 Flash版本
         self.llm = ChatOpenAI(
             model="gemini-2.0-flash",
             temperature=0,
             openai_api_key=os.environ["OPENAI_API_KEY"],
             openai_api_base=os.environ["OPENAI_API_BASE"],
         )
+        # 設定文本拆分器，設定塊大小與重疊字元數
         self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=150)
 
     def load_and_split_pdf(self, pdf_path: str) -> List[Document]:
-        loader = EasyOCRPDFLoader(pdf_path)
+        # 使用PaddleOCRPDFLoader讀取PDF並OCR轉文字
+        loader = PaddleOCRPDFLoader(pdf_path)
         raw_docs = loader.load()
         print(f"共讀取 {len(raw_docs)} 個文件塊（頁面）")
 
+        # 對讀取的文件塊進行拆分成更小段落
         split_docs = self.text_splitter.split_documents(raw_docs)
         print(f"拆分成 {len(split_docs)} 個小段落")
         return split_docs
 
     def structure_document(self, text: str) -> Dict:
+        # 定義提示模板，讓LLM結構化非結構化文本
         prompt = PromptTemplate(
             input_variables=["text"],
             template=(
@@ -72,10 +80,12 @@ class ProductDatabaseBuilder:
                 "請只返回JSON，不要多餘文字。"
             )
         )
+        # 建立LLMChain執行結構化任務
         chain = LLMChain(llm=self.llm, prompt=prompt)
         result = chain.run(text=text)
         print(f"LLM結構化返回結果示例（前500字）：{result[:500]}")
 
+        # 嘗試解析JSON，若失敗則返回原始文本
         try:
             structured_data = json.loads(result)
         except Exception as e:
@@ -84,6 +94,7 @@ class ProductDatabaseBuilder:
         return structured_data
 
     def aggregate_structured_jsons(self, json_list: List[Dict]) -> Dict:
+        # 將多個JSON片段合併為一個完整結構
         fragments_text = "\n".join(
             [f"片段{i+1}：{json.dumps(j, ensure_ascii=False)}" for i, j in enumerate(json_list)]
         )
@@ -111,9 +122,11 @@ class ProductDatabaseBuilder:
         return structured_data
 
     def build_product_database(self, pdf_path: str):
+        # 讀取並拆分PDF文件
         split_docs = self.load_and_split_pdf(pdf_path)
 
         structured_jsons = []
+        # 對拆分後的每個段落進行結構化處理
         for idx, doc in enumerate(split_docs):
             print(f"結構化處理第 {idx + 1}/{len(split_docs)} 段")
             structured_json = self.structure_document(doc.page_content)
@@ -123,6 +136,7 @@ class ProductDatabaseBuilder:
         final_structured = self.aggregate_structured_jsons(structured_jsons)
         print("聚合完成，結果示例:", json.dumps(final_structured, ensure_ascii=False)[:500])
 
+        # 將聚合後的結構化資料封裝成Document
         structured_documents = [
             Document(
                 page_content=json.dumps(final_structured, ensure_ascii=False),
@@ -134,6 +148,7 @@ class ProductDatabaseBuilder:
             )
         ]
 
+        # 建立並持久化向量資料庫
         vectordb = Chroma.from_documents(structured_documents, self.embeddings, persist_directory=CHROMA_DB_PATH)
         vectordb.persist()
         print("產品資料庫建立完成並持久化。")
@@ -141,6 +156,7 @@ class ProductDatabaseBuilder:
 
 class InsuranceAIAgent:
     def __init__(self):
+        # 初始化OpenAI嵌入模型與LLM
         self.embeddings = OpenAIEmbeddings()
         self.llm = ChatOpenAI(
             model="gemini-2.5-flash",
@@ -148,18 +164,24 @@ class InsuranceAIAgent:
             openai_api_key=os.environ["OPENAI_API_KEY"],
             openai_api_base=os.environ["OPENAI_API_BASE"],
         )
+        # 設定文本拆分器
         self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=150)
+        # 載入持久化的向量資料庫
         self.vectordb = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=self.embeddings)
         self.retriever = self.vectordb.as_retriever(search_kwargs={"k": 5})
 
     def extract_customer_profile(self, pdf_path: str) -> str:
         print(f"解析客戶PDF檔案: {pdf_path}")
-        loader = EasyOCRPDFLoader(pdf_path)
+        # 使用PaddleOCRPDFLoader讀取客戶PDF並OCR轉文字
+        loader = PaddleOCRPDFLoader(pdf_path)
         raw_docs = loader.load()
+        # 對文字進行拆分
         split_docs = self.text_splitter.split_documents(raw_docs)
 
+        # 合併拆分後文字為完整客戶文本
         full_customer_text = "\n".join([doc.page_content for doc in split_docs])
 
+        # 定義提示模板，讓LLM提取客戶畫像
         prompt = PromptTemplate(
             input_variables=["customer_full_text"],
             template=(
@@ -177,9 +199,11 @@ class InsuranceAIAgent:
         return customer_profile_text
 
     def recommend_products(self, customer_profile_text: str) -> Dict:
+        # 根據客戶畫像從向量資料庫檢索相關產品資料
         related_docs = self.retriever.get_relevant_documents(customer_profile_text)
         context_text = "\n".join([doc.page_content for doc in related_docs])
 
+        # 定義推薦提示模板
         prompt_template = (
             "你是一個專業的保險顧問，根據以下客戶畫像和相關產品資料，"
             "請推薦最適合該客戶的保險產品。\n\n"
