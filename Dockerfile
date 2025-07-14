@@ -23,13 +23,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # libheif-dev：pillow_heif 編譯依賴
 
 # 設定工作目錄
-WORKDIR /app/backend
+WORKDIR /app
 
-# 先複製 requirements.txt，利用 Docker 快取機制加速構建
-COPY requirements.txt /app/
+# 安装系统依赖（PaddlePaddle 推荐）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# 升級 pip 並安裝 Python 依賴
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y poppler-utils
+
+RUN pip install --upgrade pip
+
+# 先安装 paddlepaddle，确保版本兼容
+RUN pip install paddlepaddle==2.6.2 -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 统一安装其他依赖，包括 paddleocr 和 paddlex
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade paddlepaddle
+RUN pip install --upgrade paddlex
 
 # 複製專案所有程式碼到容器中
 COPY . /app
@@ -44,4 +60,4 @@ EXPOSE 5000
 # 例如：docker run -e OPENAI_API_KEY=your_key -e OPENAI_API_BASE=your_base ...
 
 # 容器啟動時執行 Flask 應用，假設入口檔案為 app.py，請依實際情況修改
-CMD ["python", "app.py"]
+CMD ["python", "backend/app.py"]

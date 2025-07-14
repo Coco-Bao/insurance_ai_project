@@ -39,6 +39,7 @@ def upload_product_pdf():
     file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
     # 儲存上傳的檔案
     file.save(file_path)
+    print(f"File saved to: {file_path}")
 
     try:
         # 建立產品資料庫
@@ -76,6 +77,7 @@ def upload_customer_pdf_and_recommend():
     file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
     # 儲存上傳的檔案
     file.save(file_path)
+    print(f"File saved to: {file_path}")
 
     try:
         # 使用AI代理提取客戶畫像
@@ -94,4 +96,4 @@ def upload_customer_pdf_and_recommend():
 
 if __name__ == '__main__':
     print("後端服務準備就緒。")
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', debug=True, port=5000)

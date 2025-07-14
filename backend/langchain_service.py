@@ -8,6 +8,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.schema import Document
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+from dotenv import load_dotenv
 
 from paddleocr import PaddleOCR
 from pdf2image import convert_from_path
@@ -17,7 +18,10 @@ import numpy as np
 CHROMA_DB_PATH = "data/chroma_db"
 
 # 初始化 PaddleOCR，支援繁體中文和英文，GPU設為False（如有GPU可設True）
-paddle_ocr = PaddleOCR(lang='ch', use_angle_cls=True, use_gpu=False)
+paddle_ocr = PaddleOCR(lang='ch', use_angle_cls=False)
+
+# 自动加载当前目录下的 .env 文件
+load_dotenv()
 
 class PaddleOCRPDFLoader:
     def __init__(self, pdf_path: str):
@@ -31,8 +35,8 @@ class PaddleOCRPDFLoader:
         for i, page in enumerate(pages):
             # 將PIL圖片轉成OpenCV格式（BGR）
             img = cv2.cvtColor(np.array(page), cv2.COLOR_RGB2BGR)
-            # 使用PaddleOCR進行文字辨識，cls=True啟用方向分類
-            result = self.ocr.ocr(img, cls=True)
+            # 使用PaddleOCR進行文字辨識
+            result = self.ocr.ocr(img)
             # 將辨識結果中每行文字取出並合併成一整頁文字
             page_text = "\n".join([line[1][0] for line in result[0]])
             # 封裝成Document物件，並加入頁碼metadata
@@ -159,7 +163,7 @@ class InsuranceAIAgent:
         # 初始化OpenAI嵌入模型與LLM
         self.embeddings = OpenAIEmbeddings()
         self.llm = ChatOpenAI(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash",
             temperature=0,
             openai_api_key=os.environ["OPENAI_API_KEY"],
             openai_api_base=os.environ["OPENAI_API_BASE"],
