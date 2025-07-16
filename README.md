@@ -19,7 +19,7 @@ This project is an AI-powered insurance assistant built with Python and Docker. 
 
 ## Project Overview
 
-This project provides an AI insurance agent that leverages Google’s generative language API. It uses Python 3.9 slim as the base image and requires several system dependencies to support libraries such as `pdf2image`, `opencv`, and `pillow_heif`.
+This project provides an AI insurance agent that leverages Google’s generative language API. It uses Python 3.12 slim as the base image and requires several system dependencies to support libraries.
 
 ---
 
@@ -36,7 +36,7 @@ This project provides an AI insurance agent that leverages Google’s generative
 1. **Clone the repository**
 
 ```env
-git clone https://github.com/your-username/your-repo.git
+git clone https://github.com/Coco-Bao/insurance_ai_project
 cd your-repo
 ```
 

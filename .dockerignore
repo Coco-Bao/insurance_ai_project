@@ -2,8 +2,15 @@ __pycache__
 *.pyc
 *.pyo
 *.pyd
+*.swp
+env/
+venv/
 .env
-.git
+*.git
+.gitignore
+.DS_Store
+*.log
+data/
+uploaded_files/
 .vscode
 node_modules
-*.log
