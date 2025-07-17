@@ -1,32 +1,44 @@
 import os
 import json
 from typing import List, Dict, Any
-from langchain.schema import Document
+from langchain.schema import Document, HumanMessage
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
 from langchain.chat_models import ChatOpenAI
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+# 移除了未使用的 LLMChain 和 PromptTemplate 相關匯入
 
 from docling.document_converter import DocumentConverter, InputFormat, PdfFormatOption
 from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
 from huggingface_hub import snapshot_download
 
-os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "你的OpenAI_API_Key")
 CHROMA_DB_PATH = "data/chroma_db"
+
+def get_env_variable(var_name: str) -> str:
+    """輔助函數：取得環境變數，如不存在則拋錯"""
+    value = os.environ.get(var_name)
+    if not value:
+        raise ValueError(f"環境變數 {var_name} 未設定")
+    return value
 
 class ProductDatabaseBuilder:
     def __init__(self):
         self.embeddings = OpenAIEmbeddings()
-        self.llm = ChatOpenAI(model="gpt-4", temperature=0)
+        self.llm = ChatOpenAI(
+            model="gemini-2.0-flash",
+            temperature=0,
+            openai_api_key=get_env_variable("OPENAI_API_KEY"),
+            openai_api_base=get_env_variable("OPENAI_API_BASE"),
+        )
         self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=150)
 
-        print("下載 RapidOCR 模型（首次運行會自動快取）...")
+        print("下載 RapidOCR 模型...")
         model_cache_path = snapshot_download(repo_id="SWHL/RapidOCR")
 
+        # 修改：更新 OCR 偵測模型檔名，將 en_PP-OCRv3_det_infer.onnx 改成 en_PP-OCRv4_det_infer.onnx
         self.ocr_options = RapidOcrOptions(
-            det_model_path=os.path.join(model_cache_path, "PP-OCRv4", "en_PP-OCRv3_det_infer.onnx"),
+            det_model_path=os.path.join(model_cache_path, "PP-OCRv4", "en_PP-OCRv4_det_infer.onnx"),
             rec_model_path=os.path.join(model_cache_path, "PP-OCRv4", "ch_PP-OCRv4_rec_server_infer.onnx"),
             cls_model_path=os.path.join(model_cache_path, "PP-OCRv3", "ch_ppocr_mobile_v2.0_cls_train.onnx")
         )
@@ -39,8 +51,8 @@ class ProductDatabaseBuilder:
 
     def _split_docs_by_titles(self, doc_json: Dict[str, Any]) -> List[Document]:
         """
-        將Docling導出的結構化JSON依據標題切分成多個段落。
-        假設每個標題是一個區塊的起始。此處示範以 'heading' 或 'title' 字段做標題判斷。
+        根據導出的結構化 JSON 中每個區塊的 'heading' 或 'title' 欄位進行切割，
+        然後利用 LangChain 文本拆分器進一步細分文本。
         """
         blocks = doc_json.get("blocks", [])
         chunks = []
@@ -55,24 +67,19 @@ class ProductDatabaseBuilder:
                     chunks.append(Document(page_content=text, metadata=meta))
 
         for block in blocks:
-            # 取得本區塊標題 (示意，有些文件可能用不同欄位，請按實際調整)
             title = block.get("heading") or block.get("title") or None
             text = block.get("text") or ""
 
             if title:
-                # 有新標題，先flush前一段
                 flush_current_chunk()
                 current_title = title
                 current_chunk = [text]
             else:
-                # 無新標題，合併進目前chunk
                 if text:
                     current_chunk.append(text)
 
-        # 最後一段
         flush_current_chunk()
 
-        # 對每個大段落用 LangChain文本拆分器進一步細分
         refined_chunks = []
         for doc in chunks:
             split_subdocs = self.text_splitter.split_documents([doc])
@@ -86,16 +93,15 @@ class ProductDatabaseBuilder:
                 InputFormat.PDF: PdfFormatOption(pipeline_options=self.pipeline_options)
             }
         )
-        print(f"開始用 Docling + RapidOCR 處理 PDF：{pdf_path}")
+        print(f"開始處理 PDF：{pdf_path}")
         conversion_result = converter.convert(pdf_path)
         doc = conversion_result.document
 
-        # 導出全文結構化JSON
+        # 導出全文結構化 JSON
         doc_json_str = doc.export_to_json(indent=2, ensure_ascii=False)
         doc_json = json.loads(doc_json_str)
-        print("成功導出結構化JSON")
+        print("成功導出結構化 JSON")
 
-        # 以標題為單位切分
         split_docs = self._split_docs_by_titles(doc_json)
         print(f"經過標題拆分和文本細分，產生 {len(split_docs)} 個段落")
 
@@ -115,12 +121,17 @@ class ProductDatabaseBuilder:
 
         vectordb = Chroma.from_documents(documents, self.embeddings, persist_directory=CHROMA_DB_PATH)
         vectordb.persist()
-        print("產品資料庫建立完成並持久化。")
+        print("產品資料庫建立完成並持久化")
 
 class InsuranceAIAgent:
     def __init__(self):
         self.embeddings = OpenAIEmbeddings()
-        self.llm = ChatOpenAI(model="gpt-4", temperature=0)
+        self.llm = ChatOpenAI(
+            model="gemini-2.0-flash",
+            temperature=0,
+            openai_api_key=get_env_variable("OPENAI_API_KEY"),
+            openai_api_base=get_env_variable("OPENAI_API_BASE"),
+        )
         self.vectordb = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=self.embeddings)
         self.retriever = self.vectordb.as_retriever(search_kwargs={"k": 5})
 
@@ -136,8 +147,9 @@ class InsuranceAIAgent:
             "請給出詳細推薦理由和支持依據。"
         )
         prompt = prompt_template.format(customer_input=input_text, context=context_text)
-        response = self.llm(prompt)
-
+        
+        # 修改：使用 HumanMessage 建構消息列表調用 Chat 模型
+        response = self.llm([HumanMessage(content=prompt)])
         return {
             "recommendation": response,
             "supported_by": [
